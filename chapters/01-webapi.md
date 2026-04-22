@@ -153,17 +153,45 @@ struct SongRow: View {
 ### データモデル（Codable構造体）
 
 ```swift
-// 該当部分のコードを抜粋して貼る
+struct SearchResponse: Codable {
+    let results: [Song]
+}
+
+struct Song: Codable, Identifiable {
+    let trackId: Int
+    let trackName: String
+    let artistName: String
+    let artworkUrl100: String
+    let previewUrl: String?
+
+    var id: Int { trackId }
+}
 ```
 
 **何をしているか：**
-（この部分が果たしている役割を説明する）
+１.この部分は、iTunes Search API から返ってきた JSON データを、Swift の中で使いやすい形に変換するための構造体を定義しています。
+2.SearchResponse は、API のレスポンス全体を表しています。
+3.API の検索結果は、最上位に results という名前の配列を持っているため、それを受け取るために let results: [Song] を定義しています。
+4.Song は、検索結果の1曲分の情報を表す構造体です。
+5.trackId は曲のID、trackName は曲名、artistName はアーティスト名、artworkUrl100 はジャケット画像のURL、previewUrl は試聴用URLです。
+6.Song は Identifiable に準拠していて、var id: Int { trackId } によって trackId を一覧表示用の識別子として使っています。
+7.つまり、この部分は「APIのJSONをアプリ内で扱える曲データに変換するための準備」をしています。
+
 
 **なぜこう書くのか：**
-（別の書き方ではなく、この書き方が選ばれている理由を説明する）
+1.Codable を付けることで、JSONDecoder() を使って JSON データを自動的に構造体へ変換できるようになります。もし Codable を使わなければ、JSON の中身を1つずつ手作業で取り出す必要があり、コードが長くなってしまいます。
+2.SearchResponse を別に作っている理由は、API の返却データがいきなり [Song] の形ではなく、results というキーの中に曲データが入っているからです。そのため、API の構造に合わせて、外側の構造体 SearchResponse と、内側の曲情報 Song を分けて書いています。
+3.previewUrl を String? にしているのは、すべての曲に試聴URLがあるとは限らないからです。
+4.もし値がない場合でもエラーにならないように、Optional にしています。
+5.また、Identifiable を付けることで、List(songs) { song in ... } のようにシンプルに一覧表示できます。
 
 **もしこう書かなかったら：**
-（この部分を省略したり変えたりすると何が起きるか。実際に試した結果があればここに書く）
+1.もし Codable を付けなかったら、JSONDecoder().decode(...) が使えず、API から受け取った JSON を自動で変換できません。
+2.その場合は、JSON を辞書のように扱って自分で値を取り出す必要があり、コードがかなり複雑になります。
+3.もし SearchResponse を作らずに、最初から [Song] として解析しようとすると、API の実際の構造と一致しないため、デコードに失敗します。
+4.もし previewUrl を String? ではなく String にした場合、試聴URLを持っていない曲が含まれているとエラーになる可能性があります。
+5.もし Identifiable を付けなかった場合は、List で表示するときに「どのデータがどの行か」を SwiftUI が判断しにくくなります。その場合は List(songs, id: \.trackId) のように別の書き方をする必要があります。
+つまり、この書き方は「JSONを安全に読み取り、後のList表示も簡単にするための書き方」です。
 
 ---
 
