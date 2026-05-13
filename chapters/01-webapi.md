@@ -413,9 +413,37 @@ struct SongRow: View {
 
 **何をしているか：**
 
+この部分では、SwiftUIを使って検索画面と検索結果画面を構成している。
+
+TextFieldでアーティスト名を入力し、Buttonを押すことで searchMusic() が呼ばれ、iTunes Search APIとの通信を開始する。
+
+取得した曲データは songs に保存され、Listを使って一覧表示される。
+
+また、isLoading を使って通信中かどうかを管理し、検索中は ProgressView を表示している。
+
+各曲の行では SongRow を使い、AsyncImage によってアートワーク画像を表示している。
+
+
 **なぜこう書くのか：**
 
+@State を使うことで、値が変更されたときに画面を自動更新できる。
+
+また、API通信は時間がかかる可能性があるため、Task と async/await を使って非同期処理として実行している。
+
+List を使うことで、配列データを簡単に一覧表示できる。
+
+さらに、AsyncImage を使うことで、画像のダウンロードと表示を簡単に実装できる。
+
+
 **もしこう書かなかったら：**
+
+@State を使わない場合、データが変更されても画面が更新されない可能性がある。
+
+Task を使わずに await を直接書くとエラーになり、非同期通信を実行できない。
+
+また、List を使わない場合は、自分で繰り返し表示処理を書く必要がある。
+
+AsyncImage を使わない場合は、画像取得や表示更新を自分で実装しなければならず、コードが複雑になる。
 
 ---
 
@@ -427,35 +455,47 @@ struct SongRow: View {
 |------|------|--------|
 | 例：`Codable` | JSONデータとSwiftの構造体を相互変換するプロトコル | `struct Song: Codable { ... }` |
 | 例：`async/await` | 非同期処理を同期的に書ける構文 | `let data = try await URLSession.shared.data(from: url)` |
-| | | |
-| | | |
-| | | |
+| Identifiable | Listでデータを区別するためのプロトコル | struct Song: Identifiable { ... } |
+| guard let | 値がない場合に処理を終了する構文 | guard let url = URL(string: urlString) else { return } |
+| AsyncImage | URLから画像を非同期で取得・表示するView | AsyncImage(url: URL(string: song.artworkUrl100)) |
 
 ## 自分の実験メモ
 
 （模範コードを改変して試したことを書く）
 
 **実験1：**
-- やったこと：
-- 結果：
-- わかったこと：
+- やったこと：struct Song: Codable, Identifiable {} -> struct Song: Codable {}
+- 結果：List(songs) の部分でエラーが表示され、リスト表示ができなくなった。Initializer 'init(_:rowContent:)' requires that 'Song' conform to 'Identifiable'
+- わかったこと：SwiftUI の List は、各データを識別するために Identifiable が必要だと分かった。
+そのため trackId を id として使っている意味を理解できた。
 
 **実験2：**
-- やったこと：
-- 結果：
-- わかったこと：
-
+- やったこと：@State private var searchText: String = "" -> @State var searchText: String = ""
+- 結果：アプリの動作自体は変わらず、検索も正常に動いた。
+- わかったこと：private は「この部屋だけで使うもの」という意味だと分かった。外してもアプリは動くが、他の場所からも触れるようになってしまう。
+  
 ## AIに聞いて特に理解が深まった質問 TOP3
 
-1. **質問：**
-   **得られた理解：**
+1. **質問：** guard let と if let の違いは？ なぜここでは guard を使うのか？
+   **得られた理解：** guard let は「値がないと後の処理ができないとき」に使うと分かった。URLが作れない場合は通信できないため、このコードでは guard let が適していると理解した。
 
-2. **質問：**
-   **得られた理解：**
+2. **質問：** Task { await searchMusic() } をなぜ使うのか？
+   **得られた理解：** Button の action では直接 await が使えないため、Task の中で非同期処理を実行していることが分かった。Task は「裏で非同期処理を動かす作業部屋」のようなものだと理解した。
 
-3. **質問：**
-   **得られた理解：**
+3. **質問：** Codable と Identifiable はそれぞれ何をしているのか？ なぜ一緒に使うのか？
+   **得られた理解：** Codable は JSONデータをSwiftの構造体へ変換するためのもので、Identifiable は List表示でデータを区別するためのものだと分かった。APIから取得したデータを画面に表示する流れでは、この2つが一緒によく使われると理解した。
 
 ## この章のまとめ
 
 （この章で学んだ最も重要なことを、未来の自分が読み返したときに役立つように書く）
+
+この章では、iTunes Search APIを使って、外部のデータをSwiftUIアプリで取得し、画面に表示する基本的な流れを学んだ。
+
+特に重要だと思ったのは：
+
+* API通信では URLSession を使ってサーバーとデータをやり取りすること
+* Codable を使うことで、JSONデータをSwiftの構造体へ自動で変換できること
+* Identifiable によって、Listが各データを区別して表示していること
+* async/await や Task を使うことで、非同期通信を分かりやすく書けること
+
+また、「なぜこの書き方をするのか」「別の書き方だとどうなるのか」を考えながら学ぶことで、コードの意味を理解しやすくなると感じた。
