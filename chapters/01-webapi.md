@@ -198,28 +198,94 @@ struct Song: Codable, Identifiable {
 ### API通信の処理
 
 ```swift
-// 該当部分のコードを抜粋して貼る
+// MARK: - API通信
+
+func searchMusic() async {
+    guard let encodedText = searchText.addingPercentEncoding(
+        withAllowedCharacters: .urlQueryAllowed
+    ) else { return }
+
+    let urlString = "https://itunes.apple.com/search?term=\(encodedText)&media=music&country=jp&limit=25"
+
+    guard let url = URL(string: urlString) else { return }
+
+    isLoading = true
+
+    do {
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let response = try JSONDecoder().decode(SearchResponse.self, from: data)
+        songs = response.results
+    } catch {
+        print("エラー: \(error.localizedDescription)")
+        songs = []
+    }
+
+    isLoading = false
+}
 ```
 
 **何をしているか：**
+入力されたアーティスト名を使って、iTunes Search APIにアクセスし、曲のデータを取得しています。取得したJSONデータをSearchResponseに変換し、songsに保存しています。
 
 **なぜこう書くのか：**
+API通信は時間がかかる処理なので、async / awaitを使って非同期で実行します。また、APIから返ってくるデータはJSON形式なので、JSONDecoderを使ってSwiftで扱える形に変換します。
 
 **もしこう書かなかったら：**
+async / awaitを使わないと、API通信を正しく待てず、データが取得できない可能性があります。また、JSONDecoderで変換しないと、取得したJSONデータをアプリ内で曲リストとして表示できません。
 
 ---
 
 ### ビューの構成
 
 ```swift
-// 該当部分のコードを抜粋して貼る
+var body: some View {
+    NavigationStack {
+        VStack {
+            // 検索バー
+            HStack {
+                TextField("アーティスト名を入力", text: $searchText)
+                    .textFieldStyle(.roundedBorder)
+
+                Button("検索") {
+                    Task {
+                        await searchMusic()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(searchText.isEmpty)
+            }
+            .padding(.horizontal)
+
+            // 検索結果リスト
+            if isLoading {
+                ProgressView("検索中...")
+                    .padding()
+                Spacer()
+            } else if songs.isEmpty {
+                ContentUnavailableView(
+                    "曲を検索してみよう",
+                    systemImage: "music.note",
+                    description: Text("アーティスト名を入力して検索ボタンを押してください")
+                )
+            } else {
+                List(songs) { song in
+                    SongRow(song: song)
+                }
+            }
+        }
+        .navigationTitle("Music Search")
+    }
+}
 ```
 
 **何をしているか：**
+検索バー、検索ボタン、検索結果リストを画面に表示しています。
 
 **なぜこう書くのか：**
+ユーザーが曲を検索し、結果を見られる画面を作るためです。
 
 **もしこう書かなかったら：**
+入力欄や結果一覧が表示されず、アプリを操作できません。
 
 ---
 
@@ -234,32 +300,44 @@ struct Song: Codable, Identifiable {
 | | | |
 | | | |
 | | | |
-
+| 項目 | 説明 | 使用例 |
+|------|------|--------|
+| `Codable` | JSONデータをSwiftの構造体に変換するために使う | `struct Song: Codable { ... }` |
+| `async/await` | API通信など時間がかかる処理を待つために使う | `try await URLSession.shared.data(from: url)` |
+| `URLSession` | 指定したURLにアクセスしてデータを取得する | `URLSession.shared.data(from: url)` |
+| `JSONDecoder` | JSONデータをSwiftの型に変換する | `JSONDecoder().decode(SearchResponse.self, from: data)` |
+| `List` | 配列のデータを一覧表示する | `List(songs) { song in ... }` |
 ## 自分の実験メモ
 
 （模範コードを改変して試したことを書く）
 
 **実験1：**
-- やったこと：
-- 結果：
-- わかったこと：
+- やったこと：検索キーワードをいろいろ変えて検索した。
+- 結果：入力したアーティスト名に合う曲が表示された。
+- わかったこと：`searchText`の内容がAPIの検索条件になることがわかった。
 
 **実験2：**
-- やったこと：
-- 結果：
-- わかったこと：
+- やったこと：`limit=25`の数字を変更してみた。
+- 結果：表示される曲数が変わった。
+- わかったこと：APIのURLのパラメータを変えると、取得するデータも変わることがわかった。
+
 
 ## AIに聞いて特に理解が深まった質問 TOP3
 
-1. **質問：**
-   **得られた理解：**
+1. **質問：**API通信の処理部分はどこか。
+   **得られた理解：**`searchMusic()`関数の中で、`URLSession`を使ってAPIにアクセスしていることがわかった。
 
-2. **質問：**
-   **得られた理解：**
 
-3. **質問：**
-   **得られた理解：**
+2. **質問：**`JSONDecoder`は何をしているか。
+   **得られた理解：**** APIから取得したJSONデータを、Swiftで使える構造体に変換していることがわかった。
+
+
+3. **質問：**ビューの構成はどこか。
+   **得られた理解：**`var body: some View`の中で、検索バーやリストなどの画面を作っていることがわかった。
+
 
 ## この章のまとめ
+SwiftUIで検索画面を作り、iTunes Search APIから音楽データを取得する方法を学んだ。  
+特に、`URLSession`でAPIにアクセスし、`JSONDecoder`でJSONをSwiftのデータに変換し、その結果を`List`で表示する流れが重要だとわかった。
 
 （この章で学んだ最も重要なことを、未来の自分が読み返したときに役立つように書く）
