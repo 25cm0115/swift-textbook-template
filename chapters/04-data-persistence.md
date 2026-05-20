@@ -17,6 +17,11 @@
 
 ## 模範コードの全体像
 
+
+
+
+```swift
+
 // ============================================
 // 第4章：データの永続化（AppStorage + SwiftData）
 // ============================================
@@ -260,10 +265,6 @@ struct SettingsView: View {
         .modelContainer(for: Memo.self, inMemory: true)
 }
 
-
-
-```swift
-// ここに模範コード全体を貼る
 ```
 
 **このアプリは何をするものか：**
@@ -271,6 +272,7 @@ struct SettingsView: View {
 （アプリの動作を自分の言葉で説明する。スクリーンショットを貼ってもよい。）
 
 ## コードの詳細解説
+
 
 ### SwiftDataモデル（@Model）
 
