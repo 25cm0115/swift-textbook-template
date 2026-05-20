@@ -277,17 +277,34 @@ struct SettingsView: View {
 ### SwiftDataモデル（@Model）
 
 ```swift
-// 該当部分のコードを抜粋して貼る
+@Model
+class Memo {
+    var title: String
+    var content: String
+    var createdAt: Date
+    var isFavorite: Bool
+
+    init(title: String, content: String, createdAt: Date = .now, isFavorite: Bool = false) {
+        self.title = title
+        self.content = content
+        self.createdAt = createdAt
+        self.isFavorite = isFavorite
+    }
+}
+
 ```
 
 **何をしているか：**
-（この部分が果たしている役割を説明する）
+SwiftDataで保存するための『メモのデータモデル』
+
 
 **なぜこう書くのか：**
-（別の書き方ではなく、この書き方が選ばれている理由を説明する）
+
+
+
 
 **もしこう書かなかったら：**
-（この部分を省略したり変えたりすると何が起きるか。実際に試した結果があればここに書く）
+`Modelない場合はデータを保存しない
 
 ---
 
