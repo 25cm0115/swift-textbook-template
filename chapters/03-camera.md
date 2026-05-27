@@ -10,6 +10,7 @@
 例：この章では、PhotosPickerでフォトライブラリから写真を選択し、UIImagePickerControllerでカメラ撮影した画像を扱う方法を学ぶ。具体的には非同期で画像データを読み込み、UIViewControllerRepresentableを使ってUIKitをSwiftUIに統合し、Coordinatorパターンを使ってカメラ機能と連携するアプリを題材にする。
 
 ## 模範コードの全体像
+```swift
 
 // ============================================
 // 第3章（応用）：写真にフィルターをかけて保存するアプリ
@@ -255,9 +256,6 @@ struct ContentView: View {
 }
 
 
-
-```swift
-// ここに模範コード全体を貼る
 ```
 
 **このアプリは何をするものか：**
@@ -269,38 +267,72 @@ struct ContentView: View {
 ### PhotosPickerによる写真選択
 
 ```swift
-// 該当部分のコードを抜粋して貼る
+@State private var selectedItem: PhotosPickerItem?
+
+PhotosPicker(selection: $selectedItem, matching: .images) {
+    Label("写真を選ぶ", systemImage: "photo")
+}
 ```
 
 **何をしているか：**
-（この部分が果たしている役割を説明する）
-
+フォトライブラリから画像を選択するためのボタンを表示しています。選ばれた写真の情報は selectedItem に入ります。
 **なぜこう書くのか：**
-（別の書き方ではなく、この書き方が選ばれている理由を説明する）
-
+SwiftUIで写真を選ぶための標準的なAPIなので、UIKitを使わずに簡単に写真選択機能を作れます。
 **もしこう書かなかったら：**
-（この部分を省略したり変えたりすると何が起きるか。実際に試した結果があればここに書く）
+写真を選ぶ入口がなくなるため、アプリで画像を読み込むことができません。
 
 ---
 
 ### 画像の非同期読み込み
 
 ```swift
-// 該当部分のコードを抜粋して貼る
+.onChange(of: selectedItem) { _, newItem in
+    Task { await loadOriginalImage(from: newItem) }
+}
+
+func loadOriginalImage(from item: PhotosPickerItem?) async {
+    guard let item = item else { return }
+
+    do {
+        if let data = try await item.loadTransferable(type: Data.self),
+           let uiImage = UIImage(data: data) {
+            originalUIImage = uiImage
+            currentFilter = .original
+            displayImage = Image(uiImage: uiImage)
+        }
+    } catch {
+        print("画像読み込みエラー: \(error)")
+    }
+}
+
 ```
 
 **何をしているか：**
+写真が選ばれたタイミングで、画像データを非同期で読み込み、画面表示用の画像に変換しています。
 
 **なぜこう書くのか：**
+写真の読み込みには時間がかかる場合があるため、async/await と Task を使って画面が止まらないようにしています。
 
 **もしこう書かなかったら：**
+写真を選んでも画像が画面に表示されません。また、同期処理で書くと画面が重くなる可能性があります。
 
 ---
 
 ### UIViewControllerRepresentableによるカメラ連携
 
 ```swift
-// 該当部分のコードを抜粋して貼る
+func saveFilteredImage() {
+    guard let uiImage = originalUIImage,
+          let ciImage = CIImage(image: uiImage),
+          let output = currentFilter.apply(to: ciImage, context: context),
+          let cgImage = context.createCGImage(output, from: ciImage.extent) else { return }
+
+    let finalImage = UIImage(cgImage: cgImage)
+    UIImageWriteToSavedPhotosAlbum(finalImage, nil, nil, nil)
+
+    saveMessage = "写真を保存しました"
+    showSaveAlert = true
+}
 ```
 
 **何をしているか：**
