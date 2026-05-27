@@ -295,58 +295,73 @@ class Memo {
 ```
 
 **何をしているか：**
-SwiftDataで保存するための『メモのデータモデル』
+SwiftDataで保存するための『メモのデータモデル』を定義しています。
 
 
 **なぜこう書くのか：**
 
-
+SwiftDataでデータを永続化するために @Model を付けています。
 
 
 **もしこう書かなかったら：**
-`Modelない場合はデータを保存しない
+メモ1件分のデータをまとめて管理するためです。
 
 ---
 
 ### データの追加・削除（modelContext）
 
 ```swift
-// 該当部分のコードを抜粋して貼る
+@Environment(\.modelContext)
+private var modelContext
+追加：modelContext.insert(memo)
+削除：modelContext.delete(memo)
 ```
 
 **何をしているか：**
+選択したメモを削除している。
 
 **なぜこう書くのか：**
+不要になったデータを削除するため。
 
 **もしこう書かなかったら：**
+削除ボタンを押してもデータが残ったままになる。
 
 ---
 
 ### @Queryによるデータ取得
 
 ```swift
-// 該当部分のコードを抜粋して貼る
+@Query(sort: \Memo.createdAt,
+       order: .reverse)
+private var memos: [Memo]
 ```
 
 **何をしているか：**
+SwiftDataからメモ一覧を取得している。
 
 **なぜこう書くのか：**
+保存されているデータを画面に表示するため。
 
 **もしこう書かなかったら：**
+保存したメモを取得できず、一覧表示できない。
 
 ---
 
 ### @AppStorageによる設定保存
 
 ```swift
-// 該当部分のコードを抜粋して貼る
+@AppStorage("userName")
+private var userName: String = ""
 ```
 
 **何をしているか：**
+ユーザー名を端末に保存している。
 
 **なぜこう書くのか：**
+アプリを終了しても設定を保持するため。
 
 **もしこう書かなかったら：**
+アプリ再起動時に設定が消えてしまう。
 
 ---
 
