@@ -81,6 +81,8 @@ struct ContentView: View {
     @State private var isSaving = false
     @State private var showSaveAlert = false
     @State private var saveMessage = ""
+    @State private var isShowingCamera = false
+    @State private var capturedUIImage: UIImage?
 
     private let context = CIContext()
 
@@ -110,6 +112,12 @@ struct ContentView: View {
                         Label("写真を選ぶ", systemImage: "photo")
                     }
                     .buttonStyle(.bordered)
+                    Button {
+                        isShowingCamera = true
+                    } label: {
+                        Label("カメラ", systemImage: "camera")
+                    }
+                    .buttonStyle(.bordered)
 
                     if displayImage != nil {
                         Button {
@@ -136,6 +144,56 @@ struct ContentView: View {
                 Button("OK") {}
             } message: {
                 Text(saveMessage)
+            }
+            .fullScreenCover(isPresented: $isShowingCamera) {
+                CameraView(capturedImage: $capturedUIImage)
+            }
+            .onChange(of: capturedUIImage) { _, newImage in
+                if let uiImage = newImage {
+                    originalUIImage = uiImage
+                    currentFilter = .original
+                    displayImage = Image(uiImage: uiImage)
+                }
+            }
+        }
+    }
+    
+    struct CameraView: UIViewControllerRepresentable {
+        @Binding var capturedImage: UIImage?
+        @Environment(\.dismiss) private var dismiss
+
+        func makeUIViewController(context: Context) -> UIImagePickerController {
+            let picker = UIImagePickerController()
+            picker.sourceType = .camera
+            picker.delegate = context.coordinator
+            return picker
+        }
+
+        func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+        func makeCoordinator() -> Coordinator {
+            Coordinator(self)
+        }
+
+        class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+            let parent: CameraView
+
+            init(_ parent: CameraView) {
+                self.parent = parent
+            }
+
+            func imagePickerController(
+                _ picker: UIImagePickerController,
+                didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+            ) {
+                if let image = info[.originalImage] as? UIImage {
+                    parent.capturedImage = image
+                }
+                parent.dismiss()
+            }
+
+            func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+                parent.dismiss()
             }
         }
     }
@@ -256,11 +314,14 @@ struct ContentView: View {
 }
 
 
+
+
 ```
 
 **このアプリは何をするものか：**
 
-（アプリの動作を自分の言葉で説明する。スクリーンショットを貼ってもよい。）
+このアプリは、フォトライブラリから写真を選択したり、カメラで写真を撮影したりして、その写真にフィルターをかけるアプリです。
+選んだ写真には、セピア、モノクロ、クローム、フェード、ブルームなどのフィルターを適用できます。また、加工した写真をフォトライブラリに保存することもできます。
 
 ## コードの詳細解説
 
@@ -320,41 +381,68 @@ func loadOriginalImage(from item: PhotosPickerItem?) async {
 
 ### UIViewControllerRepresentableによるカメラ連携
 
-```swift
-func saveFilteredImage() {
-    guard let uiImage = originalUIImage,
-          let ciImage = CIImage(image: uiImage),
-          let output = currentFilter.apply(to: ciImage, context: context),
-          let cgImage = context.createCGImage(output, from: ciImage.extent) else { return }
+struct CameraView: UIViewControllerRepresentable {
+    @Binding var capturedImage: UIImage?
+    @Environment(\.dismiss) private var dismiss
 
-    let finalImage = UIImage(cgImage: cgImage)
-    UIImageWriteToSavedPhotosAlbum(finalImage, nil, nil, nil)
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.delegate = context.coordinator
+        return picker
+    }
 
-    saveMessage = "写真を保存しました"
-    showSaveAlert = true
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
 }
 ```
 
 **何をしているか：**
+SwiftUIの画面から、UIKitの UIImagePickerController を使ってカメラを起動しています。
 
 **なぜこう書くのか：**
+カメラ機能はSwiftUIだけでは直接作りにくいため、UIViewControllerRepresentable を使ってUIKitの機能をSwiftUIで使えるようにしています。
 
 **もしこう書かなかったら：**
+SwiftUIの画面からカメラを開くことができません。
 
 ---
 
 ### Coordinatorパターン
 
 ```swift
-// 該当部分のコードを抜粋して貼る
+func makeCoordinator() -> Coordinator {
+    Coordinator(self)
+}
+
+class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+    let parent: CameraView
+
+    init(_ parent: CameraView) {
+        self.parent = parent
+    }
+
+    func imagePickerController(
+        _ picker: UIImagePickerController,
+        didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+    ) {
+        if let image = info[.originalImage] as? UIImage {
+            parent.capturedImage = image
+        }
+        parent.dismiss()
+    }
+
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        parent.dismiss()
+    }
+}
 ```
 
 **何をしているか：**
-
+カメラで撮影した写真を受け取り、capturedImage に保存しています。また、撮影後やキャンセル後にカメラ画面を閉じています。
 **なぜこう書くのか：**
-
+UIImagePickerController は撮影完了やキャンセルの結果を delegate で受け取る仕組みなので、Coordinator がSwiftUIとUIKitの橋渡しをしています。
 **もしこう書かなかったら：**
-
+撮影した写真をSwiftUI側に渡せません。また、撮影後にカメラ画面を閉じる処理もできません。
 ---
 
 （必要に応じてセクションを増やす）
@@ -365,23 +453,23 @@ func saveFilteredImage() {
 |------|------|--------|
 | 例：`PhotosPicker` | フォトライブラリから画像を選択するコンポーネント | `PhotosPicker(selection: $selectedItem, matching: .images)` |
 | 例：`UIImagePickerController` | カメラまたはフォトライブラリにアクセスするUIKitコンポーネント | `picker.sourceType = .camera` |
-| | | |
-| | | |
-| | | |
+|async/await | 時間がかかる処理を非同期で実行する書き方| try await item.loadTransferable(type: Data.self)|
+| UIImagePickerController|カメラを起動して写真を撮影するUIKitの機能| picker.sourceType = .camera|
+|UIImageWriteToSavedPhotosAlbum|画像をフォトライブラリに保存する関数 | UIImageWriteToSavedPhotosAlbum(finalImage, nil, nil, nil)|
 
 ## 自分の実験メモ
 
 （模範コードを改変して試したことを書く）
 
 **実験1：**
-- やったこと：
-- 結果：
-- わかったこと：
+- やったこと：最初はフォトライブラリから写真を選ぶ機能だけを確認しました。
+- 結果：写真を選ぶと、画面に選択した写真が表示されました。
+- わかったこと：PhotosPicker と onChange を使うことで、写真が選ばれたタイミングで画像を読み込めることが分かりました。
 
 **実験2：**
-- やったこと：
-- 結果：
-- わかったこと：
+- やったこと：フォトライブラリの写真選択機能に加えて、カメラで撮影する機能を追加しました。
+- 結果：カメラで撮影した写真も画面に表示でき、フィルターをかけることができました。
+- わかったこと：SwiftUIでカメラを使う場合は、UIViewControllerRepresentable を使ってUIKitの機能を連携する必要があると分かりました。
 
 ## AIに聞いて特に理解が深まった質問 TOP3
 
@@ -396,4 +484,6 @@ func saveFilteredImage() {
 
 ## この章のまとめ
 
-（この章で学んだ最も重要なことを、未来の自分が読み返したときに役立つように書く）
+この章では、SwiftUIで写真を選択する方法、カメラで撮影する方法、CoreImageを使って写真にフィルターをかける方法、加工した写真を保存する方法を学びました。
+特に、SwiftUIだけでなくUIKitの機能を使うために、UIViewControllerRepresentable と Coordinator が必要になることを理解しました。
+また、複数のサンプルコードをそのまま貼るのではなく、必要な機能を整理して1つの ContentView にまとめることが大切だと分かりました。
