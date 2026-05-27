@@ -473,14 +473,14 @@ UIImagePickerController は撮影完了やキャンセルの結果を delegate �
 
 ## AIに聞いて特に理解が深まった質問 TOP3
 
-1. **質問：**
-   **得られた理解：**
+1. **質問：**PhotosPickerItem から画像を表示するには、なぜ loadTransferable(type: Data.self) を使うのか。
+   **得られた理解：**PhotosPickerItem は画像そのものではなく、選択された写真の情報を持つ型なので、実際の画像データを取り出すために loadTransferable を使う必要があると分かりました。
 
-2. **質問：**
-   **得られた理解：**
+2. **質問：**UIImage、CIImage、CGImage はそれぞれ何が違うのか。
+   **得られた理解：**UIImage は画面表示や保存に使いやすい画像型で、CIImage はCoreImageでフィルター処理をするための画像型、CGImage は処理後の画像を実際に生成するために使う画像型だと分かりました。
 
-3. **質問：**
-   **得られた理解：**
+3. **質問：**なぜカメラ機能では Coordinator が必要なのか。
+   **得られた理解：**UIImagePickerController は撮影完了やキャンセルの結果をDelegateで返すため、その結果を受け取ってSwiftUI側へ渡す役割として Coordinator が必要だと分かりました。
 
 ## この章のまとめ
 
