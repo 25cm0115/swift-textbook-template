@@ -13,18 +13,12 @@
 
 ```swift
 // ============================================
-// 第2章（応用）：現在地を表示し、周辺検索する地図アプリ
-// ============================================
-// ユーザーの現在地を取得して地図上に表示し、
-// 周辺のコンビニやカフェなどを検索する機能を追加します。
-//
-// 【注意】Info.plist に以下のキーを追加してください：
-//   - NSLocationWhenInUseUsageDescription
-//     値: "現在地を地図に表示するために位置情報を使用します"
+// 第2章（基本＋応用）：MapKitで地図を表示し、現在地と周辺検索を追加するアプリ
 // ============================================
 
 import SwiftUI
 import MapKit
+import CoreLocation
 
 // MARK: - 位置情報マネージャー
 
@@ -52,8 +46,6 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
         manager.stopUpdatingLocation()
     }
 
-    // MARK: - CLLocationManagerDelegate
-
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         userLocation = locations.last?.coordinate
     }
@@ -70,32 +62,124 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
     }
 }
 
-// MARK: - 検索結果モデル
+// MARK: - データモデル
 
-struct NearbyPlace: Identifiable {
+struct Landmark: Identifiable {
     let id = UUID()
     let name: String
+    let description: String
     let coordinate: CLLocationCoordinate2D
-    let category: String
+    let category: Category
+
+    enum Category: String, CaseIterable {
+        case temple = "寺社"
+        case tower = "タワー"
+        case park = "公園"
+
+        var iconName: String {
+            switch self {
+            case .temple: return "building.columns"
+            case .tower: return "antenna.radiowaves.left.and.right"
+            case .park: return "leaf"
+            }
+        }
+
+        var color: Color {
+            switch self {
+            case .temple: return .red
+            case .tower: return .blue
+            case .park: return .green
+            }
+        }
+    }
+}
+
+// MARK: - サンプルデータ
+
+extension Landmark {
+    static let sampleData: [Landmark] = [
+        Landmark(
+            name: "浅草寺",
+            description: "東京都内最古の寺院。雷門が有名。",
+            coordinate: CLLocationCoordinate2D(latitude: 35.7148, longitude: 139.7967),
+            category: .temple
+        ),
+        Landmark(
+            name: "東京タワー",
+            description: "1958年に完成した高さ333mの電波塔。",
+            coordinate: CLLocationCoordinate2D(latitude: 35.6586, longitude: 139.7454),
+            category: .tower
+        ),
+        Landmark(
+            name: "東京スカイツリー",
+            description: "高さ634mの世界一高い自立式電波塔。",
+            coordinate: CLLocationCoordinate2D(latitude: 35.7101, longitude: 139.8107),
+            category: .tower
+        ),
+        Landmark(
+            name: "明治神宮",
+            description: "明治天皇と昭憲皇太后を祀る神社。",
+            coordinate: CLLocationCoordinate2D(latitude: 35.6764, longitude: 139.6993),
+            category: .temple
+        ),
+        Landmark(
+            name: "上野恩賜公園",
+            description: "美術館や動物園がある広大な公園。",
+            coordinate: CLLocationCoordinate2D(latitude: 35.7146, longitude: 139.7732),
+            category: .park
+        ),
+        Landmark(
+            name: "新宿御苑",
+            description: "都心にある広さ58.3ヘクタールの庭園。",
+            coordinate: CLLocationCoordinate2D(latitude: 35.6852, longitude: 139.7100),
+            category: .park
+        )
+    ]
 }
 
 // MARK: - メインビュー
 
 struct ContentView: View {
     @State private var locationManager = LocationManager()
-    @State private var cameraPosition: MapCameraPosition = .automatic
+
+    @State private var cameraPosition: MapCameraPosition = .region(
+        MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 35.6812, longitude: 139.7671),
+            span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
+        )
+    )
+
+    @State private var selectedLandmark: Landmark?
+    @State private var selectedCategories: Set<Landmark.Category> = Set(Landmark.Category.allCases)
+
     @State private var searchResults: [MKMapItem] = []
-    @State private var selectedCategory: String = "コンビニ"
+    @State private var selectedSearchCategory: String = "コンビニ"
 
     let searchCategories = ["コンビニ", "カフェ", "レストラン", "駅"]
 
+    var filteredLandmarks: [Landmark] {
+        Landmark.sampleData.filter { selectedCategories.contains($0.category) }
+    }
+
     var body: some View {
-        ZStack(alignment: .top) {
+        ZStack(alignment: .bottom) {
+
+            // 地図
             Map(position: $cameraPosition) {
-                // 現在地のマーカー
+                // 現在地
                 UserAnnotation()
 
-                // 検索結果のマーカー
+                // 観光スポットのマーカー
+                ForEach(filteredLandmarks) { landmark in
+                    Marker(
+                        landmark.name,
+                        systemImage: landmark.category.iconName,
+                        coordinate: landmark.coordinate
+                    )
+                    .tint(landmark.category.color)
+                }
+
+                // 周辺検索結果のマーカー
                 ForEach(searchResults, id: \.self) { item in
                     if let name = item.name {
                         Marker(name, coordinate: item.placemark.coordinate)
@@ -103,23 +187,31 @@ struct ContentView: View {
                     }
                 }
             }
+            .mapStyle(.standard(elevation: .realistic))
             .mapControls {
                 MapUserLocationButton()
                 MapCompass()
                 MapScaleView()
             }
 
-            // 検索カテゴリボタン
-            VStack {
-                categoryButtons
-                    .padding(.top, 8)
-                Spacer()
+            VStack(spacing: 8) {
+                // 周辺検索ボタン
+                searchCategoryButtons
+
+                if let landmark = selectedLandmark {
+                    LandmarkCard(landmark: landmark)
+                        .transition(.move(edge: .bottom))
+                }
+
+                // 観光スポットカテゴリフィルター
+                CategoryFilter(selectedCategories: $selectedCategories)
             }
+            .padding()
         }
         .onAppear {
             locationManager.requestPermission()
         }
-        .onChange(of: locationManager.userLocation?.latitude) { _, _ in
+        .onChange(of: locationManager.userLocation.map { "\($0.latitude),\($0.longitude)" }) { _, _ in
             if let location = locationManager.userLocation {
                 cameraPosition = .region(
                     MKCoordinateRegion(
@@ -131,29 +223,31 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - カテゴリボタン
+    // MARK: - 周辺検索カテゴリボタン
 
-    private var categoryButtons: some View {
+    private var searchCategoryButtons: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(searchCategories, id: \.self) { category in
                     Button {
-                        selectedCategory = category
-                        Task { await searchNearby(query: category) }
+                        selectedSearchCategory = category
+                        Task {
+                            await searchNearby(query: category)
+                        }
                     } label: {
                         Text(category)
                             .font(.subheadline)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
                             .background(
-                                selectedCategory == category
-                                    ? Color.blue
-                                    : Color(.systemBackground)
+                                selectedSearchCategory == category
+                                ? Color.blue
+                                : Color(.systemBackground)
                             )
                             .foregroundStyle(
-                                selectedCategory == category
-                                    ? .white
-                                    : .primary
+                                selectedSearchCategory == category
+                                ? .white
+                                : .primary
                             )
                             .clipShape(Capsule())
                             .shadow(color: .black.opacity(0.1), radius: 2)
@@ -166,8 +260,11 @@ struct ContentView: View {
 
     // MARK: - 周辺検索
 
+    @MainActor
     func searchNearby(query: String) async {
-        guard let userLocation = locationManager.userLocation else { return }
+        guard let userLocation = locationManager.userLocation else {
+            return
+        }
 
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = query
@@ -184,6 +281,73 @@ struct ContentView: View {
             print("検索エラー: \(error.localizedDescription)")
             searchResults = []
         }
+    }
+}
+
+// MARK: - カテゴリフィルター
+
+struct CategoryFilter: View {
+    @Binding var selectedCategories: Set<Landmark.Category>
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(Landmark.Category.allCases, id: \.self) { category in
+                Button {
+                    if selectedCategories.contains(category) {
+                        selectedCategories.remove(category)
+                    } else {
+                        selectedCategories.insert(category)
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: category.iconName)
+                        Text(category.rawValue)
+                    }
+                    .font(.caption)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        selectedCategories.contains(category)
+                        ? category.color.opacity(0.2)
+                        : Color.gray.opacity(0.1)
+                    )
+                    .foregroundStyle(
+                        selectedCategories.contains(category)
+                        ? category.color
+                        : .gray
+                    )
+                    .clipShape(Capsule())
+                }
+            }
+        }
+        .padding(8)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+// MARK: - ランドマーク詳細カード
+
+struct LandmarkCard: View {
+    let landmark: Landmark
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Image(systemName: landmark.category.iconName)
+                    .foregroundStyle(landmark.category.color)
+                Text(landmark.name)
+                    .font(.headline)
+                Spacer()
+            }
+
+            Text(landmark.description)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
