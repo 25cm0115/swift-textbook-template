@@ -8,14 +8,6 @@
 web APIを使ってデータを取得する方法を学びました、インタネットからデータを取り、アプリに表示する流れを理解します。iTunes Search API を使って音楽を検索します。APIから返してくるJSONデータをSWIFTの構造体に変換して使う方法も学びました。
 
 ## 模範コードの全体像
-// ============================================
-// 第1章（基本）：iTunes Search APIで音楽を検索するアプリ
-// ============================================
-// このアプリは、iTunes Search APIを使って
-// 音楽（曲）を検索し、結果をリスト表示します。
-// APIキーは不要で、すぐに動かすことができます。
-// ============================================
-
 import SwiftUI
 
 // MARK: - データモデル
@@ -28,81 +20,114 @@ struct Song: Codable, Identifiable {
     let trackId: Int
     let trackName: String
     let artistName: String
+    let collectionName: String?
     let artworkUrl100: String
     let previewUrl: String?
+    let trackPrice: Double?
+    let currency: String?
 
     var id: Int { trackId }
+
+    var priceText: String {
+        guard let price = trackPrice, let currency = currency else {
+            return "価格不明"
+        }
+        return "\(currency) \(String(format: "%.0f", price))"
+    }
+}
+
+// MARK: - ViewModel
+
+@Observable
+class MusicSearchViewModel {
+    var songs: [Song] = []
+    var searchText: String = ""
+    var isLoading: Bool = false
+    var errorMessage: String?
+
+    func searchMusic() async {
+        guard let encodedText = searchText.addingPercentEncoding(
+            withAllowedCharacters: .urlQueryAllowed
+        ) else {
+            errorMessage = "検索URLの作成に失敗しました"
+            return
+        }
+
+        let urlString = "https://itunes.apple.com/search?term=\(encodedText)&media=music&country=jp&limit=25"
+
+        guard let url = URL(string: urlString) else {
+            errorMessage = "URLが正しくありません"
+            return
+        }
+
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let response = try JSONDecoder().decode(SearchResponse.self, from: data)
+
+            if response.results.isEmpty {
+                errorMessage = "検索結果が見つかりませんでした"
+                songs = []
+            } else {
+                songs = response.results
+            }
+        } catch {
+            errorMessage = "通信またはデータ取得に失敗しました"
+            songs = []
+        }
+
+        isLoading = false
+    }
 }
 
 // MARK: - メインビュー
 
 struct ContentView: View {
-    @State private var songs: [Song] = []
-    @State private var searchText: String = ""
-    @State private var isLoading: Bool = false
+    @State private var viewModel = MusicSearchViewModel()
 
     var body: some View {
         NavigationStack {
             VStack {
-                // 検索バー
                 HStack {
-                    TextField("アーティスト名を入力", text: $searchText)
+                    TextField("アーティスト名を入力", text: $viewModel.searchText)
                         .textFieldStyle(.roundedBorder)
 
                     Button("検索") {
                         Task {
-                            await searchMusic()
+                            await viewModel.searchMusic()
                         }
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(searchText.isEmpty)
+                    .disabled(viewModel.searchText.isEmpty || viewModel.isLoading)
                 }
                 .padding(.horizontal)
 
-                // 検索結果リスト
-                if isLoading {
+                if let errorMessage = viewModel.errorMessage {
+                    ErrorBanner(message: errorMessage)
+                }
+
+                if viewModel.isLoading {
                     ProgressView("検索中...")
                         .padding()
                     Spacer()
-                } else if songs.isEmpty {
+                } else if viewModel.songs.isEmpty {
                     ContentUnavailableView(
                         "曲を検索してみよう",
                         systemImage: "music.note",
                         description: Text("アーティスト名を入力して検索ボタンを押してください")
                     )
                 } else {
-                    List(songs) { song in
-                        SongRow(song: song)
+                    List(viewModel.songs) { song in
+                        NavigationLink(destination: SongDetailView(song: song)) {
+                            SongRow(song: song)
+                        }
                     }
                 }
             }
             .navigationTitle("Music Search")
         }
-    }
-
-    // MARK: - API通信
-
-    func searchMusic() async {
-        guard let encodedText = searchText.addingPercentEncoding(
-            withAllowedCharacters: .urlQueryAllowed
-        ) else { return }
-
-        let urlString = "https://itunes.apple.com/search?term=\(encodedText)&media=music&country=jp&limit=25"
-
-        guard let url = URL(string: urlString) else { return }
-
-        isLoading = true
-
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let response = try JSONDecoder().decode(SearchResponse.self, from: data)
-            songs = response.results
-        } catch {
-            print("エラー: \(error.localizedDescription)")
-            songs = []
-        }
-
-        isLoading = false
     }
 }
 
@@ -132,16 +157,79 @@ struct SongRow: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
+
+            Spacer()
+
+            Text(song.priceText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .padding(.vertical, 4)
+    }
+}
+
+// MARK: - 詳細ビュー
+
+struct SongDetailView: View {
+    let song: Song
+
+    var body: some View {
+        VStack(spacing: 20) {
+            AsyncImage(url: URL(string: song.artworkUrl100)) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } placeholder: {
+                ProgressView()
+            }
+            .frame(width: 200, height: 200)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+
+            Text(song.trackName)
+                .font(.title2)
+                .bold()
+
+            Text(song.artistName)
+                .font(.title3)
+                .foregroundStyle(.secondary)
+
+            if let collectionName = song.collectionName {
+                Text(collectionName)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Text(song.priceText)
+                .font(.headline)
+        }
+        .padding()
+        .navigationTitle("曲の詳細")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - エラーバナー
+
+struct ErrorBanner: View {
+    let message: String
+
+    var body: some View {
+        HStack {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.yellow)
+
+            Text(message)
+                .font(.caption)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity)
+        .background(.red.opacity(0.1))
     }
 }
 
 #Preview {
     ContentView()
 }
-
-
 
 **このアプリは何をするものか：**
 
