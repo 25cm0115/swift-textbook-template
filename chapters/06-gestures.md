@@ -4,557 +4,619 @@
 > 最終更新：2026/06/19
 
 ## この章で学ぶこと
-
-（この章で扱うトピックの概要を2〜3行で書く。自分の言葉で。）
-
-例：この章では、ユーザーの指の動きを検出するジェスチャー認識の方法を学ぶ。タップ・ロングプレス・ドラッグ・拡大縮小・回転など、各ジェスチャーの実装方法を学び、最終的にTinder風のスワイプUIで複数のジェスチャーを組み合わせた実装を題材にする。
+この章では、SwiftUIでユーザーの指の動きを検出するジェスチャーについて学んだ。
+タップ、ロングプレス、ドラッグ、ピンチによる拡大縮小、回転などの基本的な操作を実装した。
+さらに応用として、カードを左右にスワイプして仕分けるTinder風のUIも作成した。
 
 ## 模範コードの全体像
-
-（教員から配布された模範コードをここに貼り付ける）
-
 ```swift
 // ============================================
-// 第7章（基本）：加速度センサーで動く水平器アプリ
+// 第6章（基本）：ジェスチャーで操作するカードアプリ
 // ============================================
-// CoreMotionを使って端末の傾きをリアルタイムで取得し、
-// 水平器（水準器）として表示するアプリです。
-//
-// 【注意】シミュレータではセンサーが使えません。
-//         実機（iPhone / iPad）でテストしてください。
+// タップ、ロングプレス、ドラッグ、ピンチ、回転の
+// 各ジェスチャーを実際に体験しながら学びます。
 // ============================================
 
 import SwiftUI
-import CoreMotion
-
-// MARK: - モーションマネージャー
-
-@Observable
-class MotionManager {
-    private let motionManager = CMMotionManager()
-
-    var pitch: Double = 0    // 前後の傾き
-    var roll: Double = 0     // 左右の傾き
-    var yaw: Double = 0      // 水平方向の回転
-    var isAvailable: Bool = false
-
-    func startUpdates() {
-        guard motionManager.isDeviceMotionAvailable else {
-            isAvailable = false
-            return
-        }
-
-        isAvailable = true
-        motionManager.deviceMotionUpdateInterval = 1.0 / 60.0
-
-        motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, error in
-            guard let self = self, let motion = motion else { return }
-
-            self.pitch = motion.attitude.pitch
-            self.roll = motion.attitude.roll
-            self.yaw = motion.attitude.yaw
-        }
-    }
-
-    func stopUpdates() {
-        motionManager.stopDeviceMotionUpdates()
-    }
-}
 
 // MARK: - メインビュー
 
 struct ContentView: View {
-    @State private var motionManager = MotionManager()
-
     var body: some View {
         NavigationStack {
-            if motionManager.isAvailable {
-                VStack(spacing: 30) {
-                    // 水平器の円
-                    LevelIndicator(
-                        pitch: motionManager.pitch,
-                        roll: motionManager.roll
-                    )
+            List {
+                NavigationLink("タップ & ロングプレス") {
+                    TapDemoView()
+                }
+                NavigationLink("ドラッグ") {
+                    DragDemoView()
+                }
+                NavigationLink("ピンチ（拡大縮小）") {
+                    MagnifyDemoView()
+                }
+                NavigationLink("回転") {
+                    RotateDemoView()
+                }
+                NavigationLink("組み合わせ") {
+                    CombinedDemoView()
+                }
+            }
+            .navigationTitle("ジェスチャー体験")
+        }
+    }
+}
 
-                    // 数値表示
-                    DataDisplay(
-                        pitch: motionManager.pitch,
-                        roll: motionManager.roll,
-                        yaw: motionManager.yaw
+// MARK: - タップ & ロングプレス
+
+struct TapDemoView: View {
+    @State private var tapCount = 0
+    @State private var backgroundColor: Color = .blue
+    @State private var isPressed = false
+
+    var body: some View {
+        VStack(spacing: 30) {
+            Text("タップ回数: \(tapCount)")
+                .font(.title)
+
+            // シングルタップ
+            RoundedRectangle(cornerRadius: 16)
+                .fill(backgroundColor)
+                .frame(width: 200, height: 200)
+                .overlay {
+                    Text("タップしてね")
+                        .foregroundStyle(.white)
+                        .font(.headline)
+                }
+                .onTapGesture {
+                    tapCount += 1
+                    backgroundColor = Color(
+                        hue: Double.random(in: 0...1),
+                        saturation: 0.7,
+                        brightness: 0.9
                     )
                 }
+
+            // ロングプレス
+            Circle()
+                .fill(isPressed ? .green : .orange)
+                .frame(width: 120, height: 120)
+                .scaleEffect(isPressed ? 1.3 : 1.0)
+                .overlay {
+                    Text(isPressed ? "成功!" : "長押し")
+                        .foregroundStyle(.white)
+                        .font(.headline)
+                }
+                .animation(.spring(duration: 0.3), value: isPressed)
+                .onLongPressGesture(minimumDuration: 1.0) {
+                    isPressed = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                        isPressed = false
+                    }
+                }
+        }
+        .navigationTitle("タップ & ロングプレス")
+    }
+}
+
+// MARK: - ドラッグ
+
+struct DragDemoView: View {
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+
+    var body: some View {
+        VStack {
+            Text("カードをドラッグしてみよう")
+                .font(.headline)
                 .padding()
-                .navigationTitle("水平器")
-            } else {
-                ContentUnavailableView(
-                    "センサーが利用できません",
-                    systemImage: "iphone.slash",
-                    description: Text("このアプリは実機（iPhone）で動作します。\nシミュレータではセンサーが使えません。")
-                )
-            }
-        }
-        .onAppear {
-            motionManager.startUpdates()
-        }
-        .onDisappear {
-            motionManager.stopUpdates()
-        }
-    }
-}
-
-// MARK: - 水平器インジケーター
-
-struct LevelIndicator: View {
-    let pitch: Double
-    let roll: Double
-
-    private let maxOffset: CGFloat = 100
-
-    private var xOffset: CGFloat {
-        CGFloat(roll) * maxOffset
-    }
-
-    private var yOffset: CGFloat {
-        CGFloat(pitch) * maxOffset
-    }
-
-    private var isLevel: Bool {
-        abs(pitch) < 0.03 && abs(roll) < 0.03
-    }
-
-    var body: some View {
-        ZStack {
-            // 外側の円
-            Circle()
-                .stroke(.gray.opacity(0.3), lineWidth: 2)
-                .frame(width: 250, height: 250)
-
-            // 中心の十字線
-            Path { path in
-                path.move(to: CGPoint(x: 125, y: 0))
-                path.addLine(to: CGPoint(x: 125, y: 250))
-                path.move(to: CGPoint(x: 0, y: 125))
-                path.addLine(to: CGPoint(x: 250, y: 125))
-            }
-            .stroke(.gray.opacity(0.2), lineWidth: 1)
-            .frame(width: 250, height: 250)
-
-            // 中間の円
-            Circle()
-                .stroke(.gray.opacity(0.2), lineWidth: 1)
-                .frame(width: 125, height: 125)
-
-            // バブル（傾きに応じて移動）
-            Circle()
-                .fill(isLevel ? .green : .red)
-                .frame(width: 40, height: 40)
-                .opacity(0.8)
-                .shadow(color: isLevel ? .green : .red, radius: 8)
-                .offset(
-                    x: max(-maxOffset, min(maxOffset, xOffset)),
-                    y: max(-maxOffset, min(maxOffset, yOffset))
-                )
-                .animation(.spring(duration: 0.1), value: xOffset)
-                .animation(.spring(duration: 0.1), value: yOffset)
-
-            // 水平時の表示
-            if isLevel {
-                Text("水平!")
-                    .font(.headline)
-                    .foregroundStyle(.green)
-                    .offset(y: 140)
-            }
-        }
-    }
-}
-
-// MARK: - 数値データ表示
-
-struct DataDisplay: View {
-    let pitch: Double
-    let roll: Double
-    let yaw: Double
-
-    var body: some View {
-        VStack(spacing: 12) {
-            DataRow(
-                label: "前後の傾き（Pitch）",
-                value: pitch,
-                icon: "arrow.up.and.down"
-            )
-            DataRow(
-                label: "左右の傾き（Roll）",
-                value: roll,
-                icon: "arrow.left.and.right"
-            )
-            DataRow(
-                label: "水平回転（Yaw）",
-                value: yaw,
-                icon: "arrow.triangle.2.circlepath"
-            )
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.gray.opacity(0.05))
-        )
-    }
-}
-
-struct DataRow: View {
-    let label: String
-    let value: Double
-    let icon: String
-
-    var body: some View {
-        HStack {
-            Image(systemName: icon)
-                .frame(width: 30)
-                .foregroundStyle(.blue)
-
-            Text(label)
-                .font(.caption)
 
             Spacer()
 
-            Text(String(format: "%.3f rad", value))
-                .font(.system(.caption, design: .monospaced))
+            RoundedRectangle(cornerRadius: 20)
+                .fill(
+                    LinearGradient(
+                        colors: [.purple, .blue],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 200, height: 280)
+                .shadow(radius: 8)
+                .overlay {
+                    VStack {
+                        Image(systemName: "hand.draw")
+                            .font(.system(size: 40))
+                        Text("ドラッグ")
+                            .font(.title3)
+                    }
+                    .foregroundStyle(.white)
+                }
+                .offset(offset)
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            offset = CGSize(
+                                width: lastOffset.width + value.translation.width,
+                                height: lastOffset.height + value.translation.height
+                            )
+                        }
+                        .onEnded { _ in
+                            lastOffset = offset
+                        }
+                )
+
+            Spacer()
+
+            Button("リセット") {
+                withAnimation(.spring) {
+                    offset = .zero
+                    lastOffset = .zero
+                }
+            }
+            .buttonStyle(.bordered)
+            .padding()
+        }
+        .navigationTitle("ドラッグ")
+    }
+}
+
+// MARK: - ピンチ（拡大縮小）
+
+struct MagnifyDemoView: View {
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+
+    var body: some View {
+        VStack {
+            Text("ピンチで拡大縮小")
+                .font(.headline)
+                .padding()
+
+            Text(String(format: "倍率: %.1fx", scale))
+                .font(.caption)
                 .foregroundStyle(.secondary)
 
-            Text(String(format: "(%.1f°)", value * 180 / .pi))
-                .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .frame(width: 60, alignment: .trailing)
+            Spacer()
+
+            Image(systemName: "star.fill")
+                .font(.system(size: 100))
+                .foregroundStyle(.yellow)
+                .scaleEffect(scale)
+                .gesture(
+                    MagnifyGesture()
+                        .onChanged { value in
+                            scale = lastScale * value.magnification
+                        }
+                        .onEnded { _ in
+                            lastScale = scale
+                        }
+                )
+
+            Spacer()
+
+            Button("リセット") {
+                withAnimation(.spring) {
+                    scale = 1.0
+                    lastScale = 1.0
+                }
+            }
+            .buttonStyle(.bordered)
+            .padding()
         }
+        .navigationTitle("ピンチ")
+    }
+}
+
+// MARK: - 回転
+
+struct RotateDemoView: View {
+    @State private var angle: Angle = .zero
+    @State private var lastAngle: Angle = .zero
+
+    var body: some View {
+        VStack {
+            Text("2本指で回転")
+                .font(.headline)
+                .padding()
+
+            Text(String(format: "角度: %.0f°", angle.degrees))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Image(systemName: "arrow.up")
+                .font(.system(size: 80))
+                .foregroundStyle(.red)
+                .rotationEffect(angle)
+                .gesture(
+                    RotateGesture()
+                        .onChanged { value in
+                            angle = lastAngle + value.rotation
+                        }
+                        .onEnded { _ in
+                            lastAngle = angle
+                        }
+                )
+
+            Spacer()
+
+            Button("リセット") {
+                withAnimation(.spring) {
+                    angle = .zero
+                    lastAngle = .zero
+                }
+            }
+            .buttonStyle(.bordered)
+            .padding()
+        }
+        .navigationTitle("回転")
+    }
+}
+
+// MARK: - 組み合わせ
+
+struct CombinedDemoView: View {
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var angle: Angle = .zero
+    @State private var lastAngle: Angle = .zero
+
+    var body: some View {
+        VStack {
+            Text("ドラッグ・ピンチ・回転を同時に")
+                .font(.headline)
+                .padding()
+
+            Spacer()
+
+            Image(systemName: "photo.artframe")
+                .font(.system(size: 120))
+                .foregroundStyle(.indigo)
+                .scaleEffect(scale)
+                .rotationEffect(angle)
+                .offset(offset)
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            offset = CGSize(
+                                width: lastOffset.width + value.translation.width,
+                                height: lastOffset.height + value.translation.height
+                            )
+                        }
+                        .onEnded { _ in
+                            lastOffset = offset
+                        }
+                )
+                .gesture(
+                    MagnifyGesture()
+                        .onChanged { value in
+                            scale = lastScale * value.magnification
+                        }
+                        .onEnded { _ in
+                            lastScale = scale
+                        }
+                )
+                .gesture(
+                    RotateGesture()
+                        .onChanged { value in
+                            angle = lastAngle + value.rotation
+                        }
+                        .onEnded { _ in
+                            lastAngle = angle
+                        }
+                )
+
+            Spacer()
+
+            Button("リセット") {
+                withAnimation(.spring) {
+                    offset = .zero
+                    lastOffset = .zero
+                    scale = 1.0
+                    lastScale = 1.0
+                    angle = .zero
+                    lastAngle = .zero
+                }
+            }
+            .buttonStyle(.bordered)
+            .padding()
+        }
+        .navigationTitle("組み合わせ")
     }
 }
 
 #Preview {
     ContentView()
 }
+
 // ============================================
 //
-//  ActivityTrackerView.swift
-//  SensorBasic
+//  AnimalSwipeView.swift
+//  GestureCardLab
 //
-//  Created by cmStudent on 2026/06/19.
+//  Created by cmStudent on 2026/06/20.
 //
 
 // ============================================
-// 第7章（応用）：歩数計・移動距離トラッカー
+// 第6章（応用）：Tinder風スワイプカードUI
 // ============================================
-// CoreMotion（歩数計）とCoreLocation（移動距離）を
-// 組み合わせて、今日の活動を記録するアプリです。
-//
-// 【注意】Info.plist に以下のキーを追加してください：
-//   - NSMotionUsageDescription
-//     値: "歩数を計測するためにモーションセンサーを使用します"
-//   - NSLocationWhenInUseUsageDescription
-//     値: "移動距離を計測するために位置情報を使用します"
+// ドラッグジェスチャーとアニメーションを組み合わせて、
+// カードを左右にスワイプして仕分けるUIを作ります。
 // ============================================
 
 import SwiftUI
-import CoreMotion
-import CoreLocation
-import Combine
 
-// MARK: - 活動トラッカー
+// MARK: - データモデル
 
-@Observable
-class ActivityTracker: NSObject, CLLocationManagerDelegate {
-    // 歩数関連
-    private let pedometer = CMPedometer()
-    var stepCount: Int = 0
-    var distance: Double = 0     // メートル
-    var isPedometerAvailable: Bool = false
+struct Animal: Identifiable {
+    let id = UUID()
+    let name: String
+    let emoji: String
+    let description: String
+    let color: Color
+}
 
-    // 位置関連
-    private let locationManager = CLLocationManager()
-    var currentSpeed: Double = 0  // m/s
-    var locations: [CLLocationCoordinate2D] = []
-
-    // 状態
-    var isTracking: Bool = false
-    var startTime: Date?
-
-    override init() {
-        super.init()
-        locationManager.delegate = self
-        locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.requestWhenInUseAuthorization()
-        isPedometerAvailable = CMPedometer.isStepCountingAvailable()
-    }
-
-    func startTracking() {
-        isTracking = true
-        startTime = Date()
-        stepCount = 0
-        distance = 0
-        locations = []
-
-        // 歩数計の開始
-        if isPedometerAvailable {
-            pedometer.startUpdates(from: Date()) { [weak self] data, error in
-                guard let self = self, let data = data else { return }
-
-                DispatchQueue.main.async {
-                    self.stepCount = data.numberOfSteps.intValue
-                    if let dist = data.distance {
-                        self.distance = dist.doubleValue
-                    }
-                }
-            }
-        }
-
-        // 位置情報の開始
-        locationManager.startUpdatingLocation()
-    }
-
-    func stopTracking() {
-        isTracking = false
-        pedometer.stopUpdates()
-        locationManager.stopUpdatingLocation()
-    }
-
-    // MARK: - CLLocationManagerDelegate
-
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations newLocations: [CLLocation]) {
-        guard let location = newLocations.last else { return }
-        currentSpeed = max(0, location.speed)
-        locations.append(location.coordinate)
-    }
-
-    // MARK: - 計算プロパティ
-
-    var elapsedTime: TimeInterval {
-        guard let start = startTime else { return 0 }
-        return Date().timeIntervalSince(start)
-    }
-
-    var distanceInKm: Double {
-        distance / 1000
-    }
-
-    var speedInKmh: Double {
-        currentSpeed * 3.6
-    }
-
-    var caloriesBurned: Double {
-        // 簡易計算：歩数 × 0.04 kcal（目安）
-        Double(stepCount) * 0.04
-    }
+extension Animal {
+    static let sampleData: [Animal] = [
+        Animal(name: "ネコ", emoji: "🐱", description: "自由気ままなマイペース派", color: .orange),
+        Animal(name: "イヌ", emoji: "🐶", description: "忠実で人懐っこい", color: .brown),
+        Animal(name: "ウサギ", emoji: "🐰", description: "おとなしくてかわいい", color: .pink),
+        Animal(name: "ペンギン", emoji: "🐧", description: "南極のタキシード紳士", color: .cyan),
+        Animal(name: "パンダ", emoji: "🐼", description: "笹が大好きなのんびり屋", color: .green),
+        Animal(name: "フクロウ", emoji: "🦉", description: "夜型の知恵者", color: .purple),
+    ]
 }
 
 // MARK: - メインビュー
 
-struct ActivityTrackerView: View {
-    @State private var tracker = ActivityTracker()
-    @State private var timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+struct AnimalSwipeView: View {
+    @State private var animals: [Animal] = Animal.sampleData
+    @State private var likedAnimals: [Animal] = []
+    @State private var dislikedAnimals: [Animal] = []
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // タイマー表示
-                    timerSection
+        VStack(spacing: 20) {
+            Text("好きな動物は？")
+                .font(.title2)
+                .bold()
 
-                    // メイン統計
-                    statsGrid
-
-                    // スタート/ストップボタン
-                    controlButton
-
-                    // 速度メーター
-                    if tracker.isTracking {
-                        SpeedMeter(speed: tracker.speedInKmh)
-                    }
-                }
-                .padding()
-            }
-            .navigationTitle("活動トラッカー")
-            .onReceive(timer) { _ in
-                // タイマーの更新をトリガー（UI再描画のため）
-                if tracker.isTracking {
-                    // @Observableなので自動で更新される
-                }
-            }
-        }
-    }
-
-    // MARK: - タイマーセクション
-
-    private var timerSection: some View {
-        VStack(spacing: 4) {
-            Text(formatTime(tracker.elapsedTime))
-                .font(.system(size: 48, weight: .thin, design: .monospaced))
-
-            if tracker.isTracking {
-                Text("計測中")
-                    .font(.caption)
+            // スコア表示
+            HStack(spacing: 40) {
+                Label("\(dislikedAnimals.count)", systemImage: "hand.thumbsdown")
+                    .foregroundStyle(.red)
+                Label("\(likedAnimals.count)", systemImage: "hand.thumbsup")
                     .foregroundStyle(.green)
             }
+            .font(.headline)
+
+            // カードスタック
+            ZStack {
+                if animals.isEmpty {
+                    VStack(spacing: 12) {
+                        Text("完了！")
+                            .font(.largeTitle)
+
+                        Button("もう一度") {
+                            animals = Animal.sampleData.shuffled()
+                            likedAnimals = []
+                            dislikedAnimals = []
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                } else {
+                    ForEach(animals.reversed()) { animal in
+                        SwipeCardView(animal: animal) { direction in
+                            removeCard(animal: animal, direction: direction)
+                        }
+                    }
+                }
+            }
+            .frame(height: 400)
+
+            // 手動ボタン
+            if !animals.isEmpty {
+                HStack(spacing: 40) {
+                    Button {
+                        if let top = animals.first {
+                            removeCard(animal: top, direction: .left)
+                        }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 50))
+                            .foregroundStyle(.red)
+                    }
+
+                    Button {
+                        if let top = animals.first {
+                            removeCard(animal: top, direction: .right)
+                        }
+                    } label: {
+                        Image(systemName: "heart.circle.fill")
+                            .font(.system(size: 50))
+                            .foregroundStyle(.green)
+                    }
+                }
+            }
+
+            Spacer()
         }
         .padding()
     }
 
-    // MARK: - 統計グリッド
-
-    private var statsGrid: some View {
-        LazyVGrid(columns: [
-            GridItem(.flexible()),
-            GridItem(.flexible()),
-        ], spacing: 16) {
-            StatCard(
-                icon: "figure.walk",
-                value: "\(tracker.stepCount)",
-                unit: "歩",
-                color: .blue
-            )
-            StatCard(
-                icon: "map",
-                value: String(format: "%.2f", tracker.distanceInKm),
-                unit: "km",
-                color: .green
-            )
-            StatCard(
-                icon: "flame",
-                value: String(format: "%.0f", tracker.caloriesBurned),
-                unit: "kcal",
-                color: .orange
-            )
-            StatCard(
-                icon: "speedometer",
-                value: String(format: "%.1f", tracker.speedInKmh),
-                unit: "km/h",
-                color: .purple
-            )
+    func removeCard(animal: Animal, direction: SwipeDirection) {
+        withAnimation(.spring(duration: 0.3)) {
+            animals.removeAll { $0.id == animal.id }
         }
-    }
 
-    // MARK: - コントロールボタン
-
-    private var controlButton: some View {
-        Button {
-            if tracker.isTracking {
-                tracker.stopTracking()
-            } else {
-                tracker.startTracking()
-            }
-        } label: {
-            HStack {
-                Image(systemName: tracker.isTracking ? "stop.fill" : "play.fill")
-                Text(tracker.isTracking ? "ストップ" : "スタート")
-            }
-            .font(.title3)
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(tracker.isTracking ? Color.red : Color.green)
-            .foregroundStyle(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+        switch direction {
+        case .left:
+            dislikedAnimals.append(animal)
+        case .right:
+            likedAnimals.append(animal)
         }
-    }
-
-    // MARK: - 時間フォーマット
-
-    func formatTime(_ interval: TimeInterval) -> String {
-        let hours = Int(interval) / 3600
-        let minutes = Int(interval) / 60 % 60
-        let seconds = Int(interval) % 60
-        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
     }
 }
 
-// MARK: - 統計カード
+// MARK: - スワイプ方向
 
-struct StatCard: View {
-    let icon: String
-    let value: String
-    let unit: String
-    let color: Color
+enum SwipeDirection {
+    case left, right
+}
+
+// MARK: - スワイプカードビュー
+
+struct SwipeCardView: View {
+    let animal: Animal
+    let onSwipe: (SwipeDirection) -> Void
+
+    @State private var offset: CGSize = .zero
+    @State private var rotation: Double = 0
+
+    private let swipeThreshold: CGFloat = 100
+
+    private var swipeProgress: CGFloat {
+        min(abs(offset.width) / swipeThreshold, 1.0)
+    }
 
     var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(color)
+        ZStack {
+            // カード背景
+            RoundedRectangle(cornerRadius: 20)
+                .fill(animal.color.opacity(0.15))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(animal.color.opacity(0.3), lineWidth: 2)
+                )
 
-            Text(value)
-                .font(.title)
-                .bold()
+            // カード内容
+            VStack(spacing: 16) {
+                Text(animal.emoji)
+                    .font(.system(size: 80))
 
-            Text(unit)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                Text(animal.name)
+                    .font(.title)
+                    .bold()
+
+                Text(animal.description)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
+
+            // いいね / NG オーバーレイ
+            if offset.width > 0 {
+                Text("LIKE")
+                    .font(.system(size: 40, weight: .bold))
+                    .foregroundStyle(.green)
+                    .opacity(swipeProgress)
+                    .rotationEffect(.degrees(-20))
+                    .position(x: 80, y: 60)
+            } else if offset.width < 0 {
+                Text("NOPE")
+                    .font(.system(size: 40, weight: .bold))
+                    .foregroundStyle(.red)
+                    .opacity(swipeProgress)
+                    .rotationEffect(.degrees(20))
+                    .position(x: 240, y: 60)
+            }
         }
-        .frame(maxWidth: .infinity)
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(color.opacity(0.08))
+        .frame(width: 300, height: 380)
+        .shadow(color: .black.opacity(0.1), radius: 8)
+        .offset(offset)
+        .rotationEffect(.degrees(rotation))
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    offset = value.translation
+                    rotation = Double(value.translation.width / 20)
+                }
+                .onEnded { value in
+                    if value.translation.width > swipeThreshold {
+                        // 右スワイプ → LIKE
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            offset = CGSize(width: 500, height: 0)
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            onSwipe(.right)
+                        }
+                    } else if value.translation.width < -swipeThreshold {
+                        // 左スワイプ → NOPE
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            offset = CGSize(width: -500, height: 0)
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            onSwipe(.left)
+                        }
+                    } else {
+                        // 元に戻す
+                        withAnimation(.spring) {
+                            offset = .zero
+                            rotation = 0
+                        }
+                    }
+                }
         )
     }
 }
 
-// MARK: - 速度メーター
-
-struct SpeedMeter: View {
-    let speed: Double
-
-    var body: some View {
-        VStack(spacing: 8) {
-            Text("現在の速度")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            ZStack {
-                Circle()
-                    .trim(from: 0, to: 0.75)
-                    .stroke(.gray.opacity(0.2), lineWidth: 8)
-                    .rotationEffect(.degrees(135))
-
-                Circle()
-                    .trim(from: 0, to: min(speed / 15.0, 1.0) * 0.75)
-                    .stroke(speedColor, style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                    .rotationEffect(.degrees(135))
-                    .animation(.spring, value: speed)
-
-                VStack {
-                    Text(String(format: "%.1f", speed))
-                        .font(.system(size: 32, weight: .bold, design: .monospaced))
-                    Text("km/h")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .frame(width: 150, height: 150)
-        }
-        .padding()
-    }
-
-    var speedColor: Color {
-        if speed < 4 { return .green }
-        if speed < 8 { return .orange }
-        return .red
-    }
-}
-
 #Preview {
-    ActivityTrackerView()
+    AnimalSwipeView()
 }
+
 
 
 
 
 **このアプリは何をするものか：**
 
-（アプリの動作を自分の言葉で説明する。スクリーンショットを貼ってもよい。）
+このアプリは、SwiftUIのジェスチャー操作を体験するためのアプリである。
+基本編では、タップすると色が変わる四角形、長押しすると反応する円、ドラッグできるカード、ピンチで拡大縮小できる星、回転できる矢印を作成した。
+応用編では、動物のカードを左右にスワイプし、好きな動物とそうでない動物を分けるカードUIを作成した。
 
 ## コードの詳細解説
 
 ### 基本ジェスチャー（タップ、ロングプレス）
 
 ```swift
-// 該当部分のコードを抜粋して貼る
+@State private var tapCount = 0
+@State private var backgroundColor: Color = .blue
+@State private var isPressed = false
+
+RoundedRectangle(cornerRadius: 16)
+    .fill(backgroundColor)
+    .frame(width: 200, height: 200)
+    .overlay {
+        Text("タップしてね")
+            .foregroundStyle(.white)
+            .font(.headline)
+    }
+    .onTapGesture {
+        tapCount += 1
+        backgroundColor = Color(
+            hue: Double.random(in: 0...1),
+            saturation: 0.7,
+            brightness: 0.9
+        )
+    }
+
+Circle()
+    .fill(isPressed ? .green : .orange)
+    .frame(width: 120, height: 120)
+    .scaleEffect(isPressed ? 1.3 : 1.0)
+    .overlay {
+        Text(isPressed ? "成功!" : "長押し")
+            .foregroundStyle(.white)
+            .font(.headline)
+    }
+    .animation(.spring(duration: 0.3), value: isPressed)
+    .onLongPressGesture(minimumDuration: 1.0) {
+        isPressed = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            isPressed = false
+        }
+    }
 ```
 
 **何をしているか：**
