@@ -9,7 +9,7 @@ ChatGPT
 ### Q1
 
 **質問：**
-（生成AIに聞いた質問をそのまま書く）
+SwiftUIでCoreLocationを使って現在地を取得したいのですが、`@Observable`を使ったクラスでCLLocationManagerDelegateを実装する場合、通常のObservableObjectと何が違いますか？
 
 **AIの回答の要点：**
 （長い回答の場合、要点だけ自分の言葉でまとめる）
