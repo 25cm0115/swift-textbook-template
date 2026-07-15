@@ -1,7 +1,7 @@
 # 第6章：ジェスチャー操作
 
-> 執筆者：（氏名）
-> 最終更新：2026/06/19
+> 執筆者：ソラナ
+> 最終更新：2026/0７/10
 
 ## この章で学ぶこと
 この章では、SwiftUIでユーザーの指の動きを検出するジェスチャーについて学んだ。
@@ -635,42 +635,104 @@ onTapGestureはタップ操作、onLongPressGestureは長押し操作を簡単�
 ### ドラッグジェスチャーとオフセット管理
 
 ```swift
+@State private var offset: CGSize = .zero
+@State private var lastOffset: CGSize = .zero
+
+.offset(offset)
+.gesture(
+    DragGesture()
+        .onChanged { value in
+            offset = CGSize(
+                width: lastOffset.width + value.translation.width,
+                height: lastOffset.height + value.translation.height
+            )
+        }
+        .onEnded { _ in
+            lastOffset = offset
+        }
+)
 
 ```
 
 **何をしているか：**
+指でカードを動かすと、その分だけoffsetの値が変わり、カードもいっしょに動く。指を離すと、そのときの位置をlastOffsetに保存する。
 
 **なぜこう書くのか：**
-
+lastOffsetを保存しておかないと、次にドラッグを始めたときに、カードが真ん中（0の位置）から急に動いてしまう。lastOffsetがあることで、前回止まった位置から続けて動かすことができる。
 **もしこう書かなかったら：**
+lastOffsetを使わずoffsetだけで位置を管理すると、2回目のドラッグを始めた瞬間にカードが元の位置にリセットされてから動くので、動きが不自然になってしまう。
 
 ---
 
 ### 拡大縮小と回転
 
 ```swift
-// 該当部分のコードを抜粋して貼る
+@State private var scale: CGFloat = 1.0
+@State private var lastScale: CGFloat = 1.0
+
+.gesture(
+    MagnifyGesture()
+        .onChanged { value in
+            scale = lastScale * value.magnification
+        }
+        .onEnded { _ in
+            lastScale = scale
+        }
+)
+
+@State private var angle: Angle = .zero
+@State private var lastAngle: Angle = .zero
+
+.gesture(
+    RotateGesture()
+        .onChanged { value in
+            angle = lastAngle + value.rotation
+        }
+        .onEnded { _ in
+            lastAngle = angle
+        }
+)
 ```
 
 **何をしているか：**
-
+2本指でつまむとscaleの値が変わり、画像が大きくなったり小さくなったりする。2本指でひねると角度（angle）が変わり、画像が回転する。
 **なぜこう書くのか：**
-
+ドラッグのときと同じ理由で、lastScaleとlastAngleを使っている。こうしておくと、指を離しても、次にもう一度ピンチや回転をしたときに、続きから操作できる。
 **もしこう書かなかったら：**
+lastScaleがないと、指を離すたびに大きさが1.0（元のサイズ）に戻ってしまう。lastAngleがないと、回転も毎回0度からやり直しになってしまう。
 
 ---
 
 ### ジェスチャーの組み合わせとアニメーション
 
 ```swift
-// 該当部分のコードを抜粋して貼る
+Image(systemName: "photo.artframe")
+    .scaleEffect(scale)
+    .rotationEffect(angle)
+    .offset(offset)
+    .gesture(
+        DragGesture()
+            .onChanged { value in ... }
+            .onEnded { _ in ... }
+    )
+    .gesture(
+        MagnifyGesture()
+            .onChanged { value in ... }
+            .onEnded { _ in ... }
+    )
+    .gesture(
+        RotateGesture()
+            .onChanged { value in ... }
+            .onEnded { _ in ... }
+    )
 ```
 
 **何をしているか：**
-
+1つの画像に、ドラッグ・ピンチ・回転という3種類のジェスチャーを同時につけている。指の動かし方によって、動く・大きくなる・回るがそれぞれ反応する。
 **なぜこう書くのか：**
-
+.gesture()を3回に分けて書くことで、SwiftUIがそれぞれのジェスチャーを別々に認識してくれる。1つにまとめる必要はなく、並べて書くだけでよい。
 **もしこう書かなかったら：**
+.gesture()を1つしか使わなかったら、ドラッグしかできない、または回転しかできないというように、1種類の操作しか反応しなくなってしまう。
 
 ---
 
@@ -682,35 +744,34 @@ onTapGestureはタップ操作、onLongPressGestureは長押し操作を簡単�
 |------|------|--------|
 | 例：`DragGesture` | ドラッグジェスチャーを認識するジェスチャーレコグナイザー | `.gesture(DragGesture().onChanged { ... })` |
 | 例：`MagnificationGesture` | ピンチジェスチャーで拡大・縮小を認識 | `.gesture(MagnificationGesture().onChanged { scale in ... })` |
-| | | |
-| | | |
-| | | |
-
+| `MagnifyGesture` | ピンチジェスチャーを認識する新しいAPI（iOS17以降） | `.gesture(MagnifyGesture().onChanged { value in scale = value.magnification })` |
+| `RotateGesture` | 2本指の回転を認識するジェスチャー | `.gesture(RotateGesture().onChanged { value in angle = value.rotation })` |
+| `onLongPressGesture` | 長押しを検出する | `.onLongPressGesture(minimumDuration: 1.0) { ... }` |
 ## 自分の実験メモ
 
-（模範コードを改変して試したことを書く）
-
 **実験1：**
-- やったこと：
-- 結果：
-- わかったこと：
+- やったこと：ドラッグできる範囲に制限をつけてみた（offsetの値が一定の範囲を超えないようにした）
+- 結果：カードが画面の外に出なくなった
+- わかったこと：offsetの値をmin・maxで制限すれば、カードが動ける範囲をコントロールできることがわかった。
 
 **実験2：**
-- やったこと：
-- 結果：
-- わかったこと：
+- やったこと：スワイプ判定に使うswipeThresholdの数値を100から50に変えてみた
+- 結果：少しドラッグしただけで、LIKE・NOPEの判定が出るようになった
+- わかったこと：この数値を小さくすると、より少ない動きでもスワイプが成立しやすくなることがわかった。反対に大きくすると、しっかり動かさないと判定されないこともわかった。
 
 ## AIに聞いて特に理解が深まった質問 TOP3
 
-1. **質問：**
-   **得られた理解：**
+1. **質問：** onChangedとonEndedはどう違うのか？
+   **得られた理解：** onChangedは指が動いている間、何度も呼ばれる。onEndedは指を離したときに1回だけ呼ばれる、ということがわかった。
 
-2. **質問：**
-   **得られた理解：**
+2. **質問：** lastOffsetやlastScaleを保存しているのはなぜか？
+   **得られた理解：** 保存しないと、次にジェスチャーを始めたときに、位置や大きさが毎回リセットされてしまうから、ということがわかった。
 
-3. **質問：**
-   **得られた理解：**
+3. **質問：** 1つのビューに.gesture()を何回も書いてもいいのか？
+   **得られた理解：** SwiftUIでは、同じビューに複数の.gesture()を付けることができ、それぞれが独立して動く、ということがわかった。
 
 ## この章のまとめ
 
-（この章で学んだ最も重要なことを、未来の自分が読み返したときに役立つように書く）
+この章では、SwiftUIのジェスチャーについて学んだ。タップ、ロングプレス、ドラッグ、ピンチ、回転など、指の動きを検出するいろいろな方法があることがわかった。
+一番大事だと思ったのは、@Stateで値を管理することと、ジェスチャーが終わったあとに「最後の状態（lastOffsetなど）」を保存しておくことである。これを忘れると、次にジェスチャーを始めたときに位置や大きさがリセットされてしまう。
+この考え方は、応用編で作ったTinder風のスワイプカードのような、少し複雑なUIを作るときにも役立った。
