@@ -1,13 +1,11 @@
 # 第3章：カメラの利用
 
 > 執筆者：ソラナ
-> 最終更新：YYYY-MM-DD
+> 最終更新：2026-07-29
 
 ## この章で学ぶこと
 
-（この章で扱うトピックの概要を2〜3行で書く。自分の言葉で。）
-
-例：この章では、PhotosPickerでフォトライブラリから写真を選択し、UIImagePickerControllerでカメラ撮影した画像を扱う方法を学ぶ。具体的には非同期で画像データを読み込み、UIViewControllerRepresentableを使ってUIKitをSwiftUIに統合し、Coordinatorパターンを使ってカメラ機能と連携するアプリを題材にする。
+写真を「選ぶ・撮る」→「加工する」→「見せる・保存する」までの流れと、SwiftUIとUIKitをつなぐ方法を学んだ章だった。
 
 ## 模範コードの全体像
 ```swift
@@ -271,6 +269,7 @@ struct ContentView: View {
             print("画像読み込みエラー: \(error)")
         }
     }
+> [!NOTE]
 
     func applyFilter() {
         guard let uiImage = originalUIImage,
@@ -445,8 +444,6 @@ UIImagePickerController は撮影完了やキャンセルの結果を delegate �
 撮影した写真をSwiftUI側に渡せません。また、撮影後にカメラ画面を閉じる処理もできません。
 ---
 
-（必要に応じてセクションを増やす）
-
 ## 新しく学んだSwiftの文法・API
 
 | 項目 | 説明 | 使用例 |
@@ -458,8 +455,6 @@ UIImagePickerController は撮影完了やキャンセルの結果を delegate �
 |UIImageWriteToSavedPhotosAlbum|画像をフォトライブラリに保存する関数 | UIImageWriteToSavedPhotosAlbum(finalImage, nil, nil, nil)|
 
 ## 自分の実験メモ
-
-（模範コードを改変して試したことを書く）
 
 **実験1：**
 - やったこと：最初はフォトライブラリから写真を選ぶ機能だけを確認しました。
@@ -487,3 +482,51 @@ UIImagePickerController は撮影完了やキャンセルの結果を delegate �
 この章では、SwiftUIで写真を選択する方法、カメラで撮影する方法、CoreImageを使って写真にフィルターをかける方法、加工した写真を保存する方法を学びました。
 特に、SwiftUIだけでなくUIKitの機能を使うために、UIViewControllerRepresentable と Coordinator が必要になることを理解しました。
 また、複数のサンプルコードをそのまま貼るのではなく、必要な機能を整理して1つの ContentView にまとめることが大切だと分かりました。
+
+
+## メモ：第3章 カメラの利用
+
+**テーマ：画像の種類のなぜ（CIImage / CGImage / UIImage）**
+
+第3章「カメラの利用」の中から、CIImage・CGImage・UIImageの違いについて話します。
+最初、この3つを見たとき、「全部『画像』なのに、なぜ3つもあるのか」と思いました。AIに聞いて、一番よく分かった部分です。
+
+---
+
+### 本体
+func applyFilter() {
+        guard let uiImage = originalUIImage,
+              let ciImage = CIImage(image: uiImage) else { return }
+
+        guard let outputImage = currentFilter.apply(to: ciImage, context: context) else { return }
+
+        if let cgImage = context.createCGImage(outputImage, from: ciImage.extent) {
+            displayImage = Image(uiImage: UIImage(cgImage: cgImage))
+        }
+    }
+
+**内容：**
+
+1. UIImageは、画面に出す・保存するための画像
+　→ 一番よく使う、普通の画像です。
+
+2. CIImageは、「画像」ではなく「これから何をするかのメモ」
+　→ CIImageを作った時点では、まだ中身（ピクセル）はできていません。フィルターの内容だけ持っています。ここが一番びっくりしました。
+
+3. CGImageは、CIContextが実際に計算して作った画像
+　→ `context.createCGImage()`を呼ぶと、初めて本当の画像データができます。
+
+4. なぜ3つも必要なのか
+　→ 表示するとき（UIImage）と、フィルターをかけるとき（CIImage）で、得意なことが違うからです。フィルターをかけるときは、メモ（CIImage）→計算（CGImage）→表示（UIImage）の順番で進みます。
+
+同じ「画像」という言葉でも、3つは全然違う役目を持っていた、という発見です。
+
+---
+
+### 学んだこと
+
+聞く前は、CIImageもUIImageも同じようなものだと思っていました。本当は「まだ中身がないメモ」と「もうできた画像」という違いがあり、コードを見ただけでは気づけませんでした。「名前が違うのには、ちゃんと理由がある」と思います。
+---
+
+
+
