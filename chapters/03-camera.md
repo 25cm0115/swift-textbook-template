@@ -488,7 +488,7 @@ UIImagePickerController は撮影完了やキャンセルの結果を delegate �
 
 **テーマ：画像の種類のなぜ（CIImage / CGImage / UIImage）**
 
-第3章「カメラの利用」の中から、CIImage・CGImage・UIImageの違いについて話します。
+「カメラの利用」の中から、CIImage・CGImage・UIImageの違いについて話します。
 最初、この3つを見たとき、「全部『画像』なのに、なぜ3つもあるのか」と思いました。AIに聞いて、一番よく分かった部分です。
 
 ---
@@ -506,6 +506,7 @@ func applyFilter() {
     }
 
 **内容：**
+![説明文](images/ciimage-flow.png)
 
 1. UIImageは、画面に出す・保存するための画像
 　→ 一番よく使う、普通の画像です。
