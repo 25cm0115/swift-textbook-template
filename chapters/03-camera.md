@@ -506,7 +506,7 @@ func applyFilter() {
     }
 
 **内容：**
-![説明文](images/ciimage-flow.png)
+![画像処理の流れ](images/画像処理の流れ.svg)
 
 1. UIImageは、画面に出す・保存するための画像
 　→ 一番よく使う、普通の画像です。
