@@ -494,18 +494,19 @@ UIImagePickerController は撮影完了やキャンセルの結果を delegate �
 ---
 
 ### 本体
+
+```swift
 func applyFilter() {
-        guard let uiImage = originalUIImage,
-              let ciImage = CIImage(image: uiImage) else { return }
+    guard let uiImage = originalUIImage,
+          let ciImage = CIImage(image: uiImage) else { return }
 
-        guard let outputImage = currentFilter.apply(to: ciImage, context: context) else { return }
+    guard let outputImage = currentFilter.apply(to: ciImage, context: context) else { return }
 
-        if let cgImage = context.createCGImage(outputImage, from: ciImage.extent) {
-            displayImage = Image(uiImage: UIImage(cgImage: cgImage))
-        }
+    if let cgImage = context.createCGImage(outputImage, from: ciImage.extent) {
+        displayImage = Image(uiImage: UIImage(cgImage: cgImage))
     }
-    
-    ```
+}
+```
 
 **内容：**
  ![画像処理の流れ](image1.svg)
