@@ -504,6 +504,8 @@ func applyFilter() {
             displayImage = Image(uiImage: UIImage(cgImage: cgImage))
         }
     }
+    
+    ```
 
 **内容：**
  ![画像処理の流れ](image1.svg)
