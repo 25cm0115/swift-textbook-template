@@ -509,6 +509,50 @@ func applyFilter() {
 ```
 
 **内容：**
+まず、AIに聞く前の自分の理解
+
+最初にこのコードを見たとき、正直、UIImageもCIImageもCGImageも「全部同じような画像でしょう？」と思っていました。名前が違うだけで、中身は似たようなものだろうと。だから、なぜわざわざ3回も型を変えているのかが分かりませんでした。
+
+AIに聞いて分かった3つの違い
+
+① UIImage → CIImage に変える（1行目）
+
+swift
+let ciImage = CIImage(image: uiImage)
+
+UIImageは、画面に出す・保存するための画像です。一番よく使う、普通の画像。
+
+でもフィルターをかけるには、UIImageのままでは使えません。CIImageに変える必要があります。
+
+ここでAIの説明が面白かったのは、「CIImageは画像ではなく、これから何をするかのメモ」という言い方でした。CIImageを作った時点では、まだ中身（ピクセル）はできていません。フィルターの内容だけ持っています。
+
+料理に例えると、CIImageは「レシピ」です。材料を書いてあるけど、まだ料理は始まっていない状態です。ここが一番びっくりしたポイントです。
+
+② フィルターをかける（2行目）
+
+swift
+let outputImage = currentFilter.apply(to: ciImage, context: context)
+
+ここでフィルター（セピア、モノクロなど）をかけます。でも、この結果もまだCIImageです。つまり、「レシピに手順を追加した」だけで、まだ料理はしていません。
+
+なぜすぐに計算しないのか？AIの説明では、フィルターを何回もかけるとき、毎回計算すると時間がかかるからです。最後に1回だけ計算するほうが速い。これを「遅延評価」と言うそうです。
+
+③ CIContext が計算して CGImage になる（3行目）
+
+swift
+let cgImage = context.createCGImage(outputImage, from: ciImage.extent)
+
+ここで初めて、CIContextが「レシピ」を見て、実際に料理を作ります。結果がCGImage、つまり本当のピクセルデータです。
+
+この行がなかったら、フィルターは設計図のままで、画面には何も出ません。
+
+④ CGImage → UIImage に戻して表示（4行目）
+
+swift
+displayImage = Image(uiImage: UIImage(cgImage: cgImage))
+
+最後に、できた料理（CGImage）をお皿（UIImage）に盛り付けて、画面に表示します。
+
  ![画像処理の流れ](image1.svg)
 
 1. UIImageは、画面に出す・保存するための画像
