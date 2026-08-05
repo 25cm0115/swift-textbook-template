@@ -515,7 +515,7 @@ func applyFilter() {
 
 AIに聞いて分かった3つの違い
 
-① UIImage → CIImage に変える（1行目）
+① UIImage → CIImage に変える
 
 swift
 let ciImage = CIImage(image: uiImage)
@@ -526,18 +526,18 @@ UIImageは、画面に出す・保存するための画像です。一番よく�
 
 ここでAIの説明が面白かったのは、「CIImageは画像ではなく、これから何をするかのメモ」という言い方でした。CIImageを作った時点では、まだ中身（ピクセル）はできていません。フィルターの内容だけ持っています。
 
-料理に例えると、CIImageは「レシピ」です。材料を書いてあるけど、まだ料理は始まっていない状態です。ここが一番びっくりしたポイントです。
+料理に例えると、CIImageは「レシピ」です。材料を書いてあるけど、まだ料理は始まっていない状態です。
 
-② フィルターをかける（2行目）
+② フィルターをかける
 
 swift
 let outputImage = currentFilter.apply(to: ciImage, context: context)
 
-ここでフィルター（セピア、モノクロなど）をかけます。でも、この結果もまだCIImageです。つまり、「レシピに手順を追加した」だけで、まだ料理はしていません。
+ここでフィルターをかけます。でも、この結果もまだCIImageです。つまり、「レシピに手順を追加した」だけで、まだ料理はしていません。
 
 なぜすぐに計算しないのか？AIの説明では、フィルターを何回もかけるとき、毎回計算すると時間がかかるからです。最後に1回だけ計算するほうが速い。これを「遅延評価」と言うそうです。
 
-③ CIContext が計算して CGImage になる（3行目）
+③ CIContext が計算して CGImage になる
 
 swift
 let cgImage = context.createCGImage(outputImage, from: ciImage.extent)
@@ -546,7 +546,7 @@ let cgImage = context.createCGImage(outputImage, from: ciImage.extent)
 
 この行がなかったら、フィルターは設計図のままで、画面には何も出ません。
 
-④ CGImage → UIImage に戻して表示（4行目）
+④ CGImage → UIImage に戻して表示
 
 swift
 displayImage = Image(uiImage: UIImage(cgImage: cgImage))
@@ -559,7 +559,7 @@ displayImage = Image(uiImage: UIImage(cgImage: cgImage))
 　→ 一番よく使う、普通の画像です。
 
 2. CIImageは、「画像」ではなく「これから何をするかのメモ」
-　→ CIImageを作った時点では、まだ中身（ピクセル）はできていません。フィルターの内容だけ持っています。ここが一番びっくりしました。
+　→ CIImageを作った時点では、まだ中身（ピクセル）はできていません。フィルターの内容だけ持っています。
 
 3. CGImageは、CIContextが実際に計算して作った画像
 　→ `context.createCGImage()`を呼ぶと、初めて本当の画像データができます。
